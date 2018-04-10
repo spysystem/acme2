@@ -10,6 +10,7 @@
 
 namespace stonemax\acme2\helpers;
 
+use Net_DNS2_Resolver;
 use stonemax\acme2\exceptions\RequestException;
 
 /**
@@ -100,21 +101,67 @@ class CommonHelper
      */
     public static function checkDNSChallenge($domain, $dnsContent)
     {
+        if(preg_match('/([^\.]+\.\w+)$/', $domain, $matches) === 1)
+		{
+			$mainDomain		= $matches[1];
+			$nameServers	= dns_get_record($mainDomain, DNS_NS);
+
+			if (count($nameServers) > 0)
+			{
+				foreach ($nameServers as $nameServer)
+				{
+					$nameServerIp	= dns_get_record($nameServer['target'], DNS_A)[0]['ip'];
+
+					try
+					{
+						if (!self::checkDNSChallengeOnNameServer($domain, $dnsContent, $nameServerIp))
+						{
+							return FALSE;
+						}
+					}
+					catch (\Net_DNS2_Exception $exception)
+					{
+						if (strpos($exception->getMessage(), 'timeout on read select') === false)
+						{
+							return FALSE;
+						}
+					}
+				}
+
+				return TRUE;
+			}
+		}
+
+		return self::checkDNSChallengeOnNameServer($domain, $dnsContent);
+    }
+
+    /**
+     * Check dns challenge locally
+     * @param string $domain
+     * @param string $dnsContent
+     * @return bool
+     */
+    public static function checkDNSChallengeOnNameServer($domain, $dnsContent, $nameServerIp = null)
+    {
         $host = '_acme-challenge.'.str_replace('*.', '', $domain);
-        $recordList = @dns_get_record($host, DNS_TXT);
 
-        if (is_array($recordList))
-        {
-            foreach ($recordList as $record)
-            {
-                if ($record['type'] == 'TXT' && $record['txt'] == $dnsContent)
-                {
-                    return TRUE;
-                }
-            }
-        }
+		$options	= [];
+		if($nameServerIp !== null)
+		{
+			$options['nameservers']	= [$nameServerIp];
+		}
 
-        return FALSE;
+		$resolver = new Net_DNS2_Resolver($options);
+		$queryResult = $resolver->query($host, 'TXT');
+		foreach ($queryResult->answer as $record)
+		{
+			if ($record->name == $host && $record->type == 'TXT' && $record->text[0] == $dnsContent)
+			{
+				return TRUE;
+			}
+		}
+
+		return FALSE;
     }
 
     /**
