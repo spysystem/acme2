@@ -374,22 +374,31 @@ class OrderService
     /**
      * Get certificate file path info after verifying
      * @param string|null $csr
+     * @param int $timeout
      * @return array
      * @throws OrderException
      * @throws \stonemax\acme2\exceptions\AccountException
      * @throws \stonemax\acme2\exceptions\NonceException
      * @throws \stonemax\acme2\exceptions\RequestException
      */
-    public function getCertificateFile($csr = NULL)
+    public function getCertificateFile($csr = NULL, $timeout = 180)
     {
         if ($this->isAllAuthorizationValid() === FALSE)
         {
             throw new OrderException("There are still some authorizations that are not valid.");
         }
 
-        $this->waitStatus('ready');
-        $this->finalizeOrder(CommonHelper::getCSRWithoutComment($csr ?: $this->getCSR()));
-        $this->waitStatus('valid');
+        if ($this->status != 'valid')
+        {
+            $this->waitStatus('ready', $timeout);
+            $this->finalizeOrder(CommonHelper::getCSRWithoutComment($csr ?: $this->getCSR()));
+            $this->waitStatus('valid', $timeout);
+
+            if ($this->status != 'valid')
+            {
+                throw new OrderException("Fetch certificate from letsencrypt failed, timed out after {$timeout} seconds.");
+            }
+        }
 
         list($code, $header, $body) = RequestHelper::get($this->certificate);
 
@@ -632,14 +641,21 @@ class OrderService
 
     /**
      * 等待订单状态
-     * @param $staus
+     * @param string $staus
+     * @param int $timeout
      * @throws OrderException
      * @throws \stonemax\acme2\exceptions\RequestException
      */
-    private function waitStatus($staus)
+    private function waitStatus($staus, $timeout)
     {
+        $maxtime = time() + $timeout;
         while ($this->status != $staus)
         {
+            if(time() > $maxtime)
+            {
+                throw new OrderException("Fetch certificate from letsencrypt failed, timed out after {$timeout} seconds. Did not get status {$staus}");
+            }
+
             sleep(3);
 
             $this->getOrder(FALSE);
