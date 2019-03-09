@@ -120,13 +120,14 @@ class AuthorizationService
      * Make letsencrypt to verify
      * @param string $type
      * @param int $timeout
+	 * @param bool $checkAllNameServers
      * @return bool
      * @throws AuthorizationException
      * @throws \stonemax\acme2\exceptions\AccountException
      * @throws \stonemax\acme2\exceptions\NonceException
      * @throws \stonemax\acme2\exceptions\RequestException
      */
-    public function verify($type, $timeout = 180)
+    public function verify($type, $timeout = 180, $checkAllNameServers = true)
     {
         $challenge = $this->getChallenge($type);
 
@@ -142,7 +143,7 @@ class AuthorizationService
         while (time() <= $endTime && $result === false)
         {
             sleep(3);
-            $result = $this->verifyLocally($type, $keyAuthorization);
+            $result = $this->verifyLocally($type, $keyAuthorization, $checkAllNameServers);
         }
 
         if ($result === false)
@@ -187,10 +188,11 @@ class AuthorizationService
      * Check locally
      * @param string $type
      * @param string $keyAuthorization
+	 * @param bool $checkAllNameServers
      * @return bool
      * @throws \stonemax\acme2\exceptions\RequestException
      */
-    private function verifyLocally($type, $keyAuthorization)
+    private function verifyLocally($type, $keyAuthorization, $checkAllNameServers = true)
     {
         $challenge = $this->getChallenge($type);
         $domain = $this->identifier['value'];
@@ -206,7 +208,7 @@ class AuthorizationService
         {
             $dnsContent = CommonHelper::base64UrlSafeEncode(hash('sha256', $keyAuthorization, TRUE));
 
-            if (!CommonHelper::checkDNSChallenge($domain, $dnsContent))
+            if (!CommonHelper::checkDNSChallenge($domain, $dnsContent, $checkAllNameServers))
             {
                 return FALSE;
             }

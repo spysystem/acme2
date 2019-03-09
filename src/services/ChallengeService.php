@@ -77,13 +77,14 @@ class ChallengeService
     /**
      * Verify
      * @param int $timeout
+	 * @param bool $checkAllNameServers
      * @return bool
      * @throws \stonemax\acme2\exceptions\AccountException
      * @throws \stonemax\acme2\exceptions\AuthorizationException
      * @throws \stonemax\acme2\exceptions\NonceException
      * @throws \stonemax\acme2\exceptions\RequestException
      */
-    public function verify($timeout = 180)
+    public function verify($timeout = 180, $checkAllNameServers = true)
     {
         $orderService = Client::$runtime->order;
 
@@ -92,6 +93,6 @@ class ChallengeService
             return TRUE;
         }
 
-        return $this->_authorication->verify($this->_type, $timeout);
+        return $this->_authorication->verify($this->_type, $timeout, $checkAllNameServers = true);
     }
 }
