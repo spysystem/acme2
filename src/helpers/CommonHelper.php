@@ -97,10 +97,30 @@ class CommonHelper
      * Check dns challenge locally
      * @param string $domain
      * @param string $dnsContent
+	 * @param bool $checkAllNameServers
      * @return bool
      */
-    public static function checkDNSChallenge($domain, $dnsContent)
+    public static function checkDNSChallenge($domain, $dnsContent, $checkAllNameServers = true)
     {
+    	if (!$checkAllNameServers)
+		{
+			$host = '_acme-challenge.'.str_replace('*.', '', $domain);
+			$recordList = @dns_get_record($host, DNS_TXT);
+
+			if (is_array($recordList))
+			{
+				foreach ($recordList as $record)
+				{
+					if ($record['type'] == 'TXT' && $record['txt'] == $dnsContent)
+					{
+						return TRUE;
+					}
+				}
+			}
+
+			return FALSE;
+		}
+
         if(preg_match('/([^\.]+\.\w+)$/', $domain, $matches) === 1)
 		{
 			$mainDomain		= $matches[1];

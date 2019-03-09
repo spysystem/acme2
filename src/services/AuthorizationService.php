@@ -123,6 +123,7 @@ class AuthorizationService
      * @param string $type
      * @param int $verifyLocallyTimeout
      * @param int $verifyCATimeout
+	 * @param bool $checkAllNameServers
      * @return bool
      * @throws AuthorizationException
      * @throws VerifyCATimeoutException
@@ -131,7 +132,7 @@ class AuthorizationService
      * @throws \stonemax\acme2\exceptions\NonceException
      * @throws \stonemax\acme2\exceptions\RequestException
      */
-    public function verify($type, $verifyLocallyTimeout, $verifyCATimeout)
+    public function verify($type, $verifyLocallyTimeout, $verifyCATimeout, $checkAllNameServers = true)
     {
         $challenge = $this->getChallenge($type);
 
@@ -142,7 +143,7 @@ class AuthorizationService
 
         $keyAuthorization = $challenge['token'].'.'.OpenSSLHelper::generateThumbprint();
 
-        $this->verifyLocally($type, $keyAuthorization, $verifyLocallyTimeout);
+        $this->verifyLocally($type, $keyAuthorization, $verifyLocallyTimeout, $checkAllNameServers);
 
         $jwk = OpenSSLHelper::generateJWSOfKid(
             $challenge['url'],
@@ -167,9 +168,10 @@ class AuthorizationService
      * @param string $type
      * @param string $keyAuthorization
      * @param int $verifyLocallyTimeout
+	 * @param bool $checkAllNameServers
      * @throws VerifyLocallyTimeoutException
      */
-    private function verifyLocally($type, $keyAuthorization, $verifyLocallyTimeout)
+    private function verifyLocally($type, $keyAuthorization, $verifyLocallyTimeout, $checkAllNameServers = true)
     {
         $verifyStartTime = time();
 
@@ -194,7 +196,7 @@ class AuthorizationService
             {
                 $dnsContent = CommonHelper::base64UrlSafeEncode(hash('sha256', $keyAuthorization, TRUE));
 
-                if (CommonHelper::checkDNSChallenge($domain, $dnsContent) === TRUE)
+                if (CommonHelper::checkDNSChallenge($domain, $dnsContent, $checkAllNameServers) === TRUE)
                 {
                     break;
                 }
